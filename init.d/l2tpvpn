@@ -1,0 +1,63 @@
+#!/bin/bash
+export PATH="/bin:/sbin:/usr/sbin:/usr/bin"
+
+default_gw=`ip route show | grep '^default' | sed -e 's/default via \([^ ]*\).*/\1/' | head -1 `
+interface=`ip route show | grep '^default' | awk '{print $5}' `
+vpn_ip=`grep lns /etc/xl2tpd/xl2tpd.conf | awk -F ' ' '{print $3}'`
+
+start_l2tp()
+{
+  /etc/init.d/ipsec start
+  /etc/init.d/xl2tpd start
+  sleep 1
+  /usr/sbin/ipsec auto --up L2TP-PSK
+  sleep 2
+  echo "c xtv-connect" > /var/run/xl2tpd/l2tp-control
+}
+
+add_route()
+{
+  ppp_interface=`ifconfig | grep -1 172.16.1.1 | head -1 |awk -F ' ' '{print $1}'`
+  route add $vpn_ip gw $default_gw $interface
+  route add default gw 172.16.1.1 $ppp_interface
+  route delete default gw $default_gw
+}
+
+restore_route()
+{
+  default_gw=`cat /tmp/vpn_oldgw`
+  route delete $vpn_ip
+  route add default gw $default_gw
+}
+
+check_l2tpd_start()
+{
+  i=0
+  while [ $i -le 5 ]
+  do
+    ifconfig | grep 172.16.1.1 > /dev/null
+    state=`echo $?`
+    if [ $state -eq 0 ]; then
+        return 0
+    fi
+
+    i=`expr $i - 1`
+    sleep 3
+  done
+  exit 1
+}
+
+if [ ! -e /tmp/vpn_oldgw ]; then
+    echo "start l2tp......"
+    echo $default_gw > /tmp/vpn_oldgw
+    start_l2tp
+    check_l2tpd_start
+    #add_route
+else
+    echo "stop l2tp......"
+    /etc/init.d/xl2tpd stop
+    /etc/init.d/ipsec stop
+    #sh /etc/ppp/ip-down.d/l2tp-down
+    #restore_route
+    #rm /tmp/vpn_oldgw
+fi

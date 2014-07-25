@@ -1,0 +1,19 @@
+auto lo
+
+iface lo inet loopback
+#iface eth0 inet dhcp
+# Use static IP instead of dhcp
+
+iface eth0 inet static
+        address 192.168.1.107
+        network 192.168.1.0
+        netmask 255.255.255.0
+        broadcast 192.168.1.255
+        gateway 192.168.1.1
+        # add a 2nd ip address
+        post-up ip addr add dev eth0 192.168.1.177/24
+        pre-down ip addr del dev eth0 192.168.1.177/24
+
+	#add a 3rd ip address
+	post-up ip addr add dev eth0 192.168.1.187/24
+	pre-down ip addr del dev eth0 192.168.1.187/24

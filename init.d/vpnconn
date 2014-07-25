@@ -1,0 +1,39 @@
+#!/bin/bash
+if [ $# != 1 ] ; then
+	echo "Usage: (sudo) sh $0 {start|stop}" 
+	exit 1;
+fi
+
+default_gw=`ip route show | grep '^default' | sed -e 's/default via \([^ ]*\).*/\1/' | head -1 `
+interface=`ip route show | grep '^default' | awk '{print $5}' `
+vpn_ip=`grep lns /etc/xl2tpd/xl2tpd.conf | awk -F ' ' '{print $3}'`
+
+function start(){
+  /etc/init.d/ipsec restart
+  /etc/init.d/xl2tpd restart
+  sleep 1
+  ipsec auto --up L2TP-PSK
+  sleep 2
+  echo "c xtv-connect" > /var/run/xl2tpd/l2tp-control
+  sleep 3
+  #ppp_interface=`ifconfig | grep -1 172.16.1.1 | head -1 |awk -F ' ' '{print $1}'`
+  #ip route add $vpn_ip gw $default_gw $interface
+  #ip route add default gw 172.16.1.1 $ppp_interface
+  #ip route delete default gw $default_gw
+}
+
+function stop(){
+  #default_gw=`cat /tmp/vpn_oldgw`
+  ip route delete $vpn_ip
+  ip route add default gw $default_gw
+  echo "stop l2tp......"
+  /etc/init.d/xl2tpd stop
+  /etc/init.d/ipsec stop
+  #sh /etc/ppp/ip-down.d/l2tp-down
+  #restore_route
+  #rm /tmp/vpn_oldgw
+}
+
+
+$1
+exit 0
